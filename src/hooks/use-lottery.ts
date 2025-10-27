@@ -3,7 +3,16 @@ import { supabase, db } from '@/integrations/supabase';
 import type { Database } from '@/integrations/supabase';
 import type { User } from '@supabase/supabase-js';
 
-type LotteryNumber = Database['public']['Tables']['lottery_numbers']['Row'];
+// Tipo simplificado para el modo demo
+type LotteryNumber = {
+  id: string;
+  number: string;
+  name: string;
+  prize?: number | null;
+  added_at: string;
+  updated_at: string;
+  user_id?: string | null;
+};
 
 export function useLottery() {
   const [numbers, setNumbers] = useState<LotteryNumber[]>([]);
@@ -22,22 +31,43 @@ export function useLottery() {
 
   // Cargar números de la lotería
   useEffect(() => {
-    if (!user) return;
-    
     async function loadNumbers() {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('lottery_numbers')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('added_at', { ascending: false });
+        
+        // Modo demo: usar datos locales si no hay conexión a Supabase
+        if (!supabase) {
+          console.log('Modo demo: usando datos locales');
+          setNumbers([]);
+          setLoading(false);
+          return;
+        }
 
-        if (error) throw error;
-        setNumbers(data || []);
+        // Si hay usuario, cargar sus números específicos
+        if (user) {
+          const { data, error } = await supabase
+            .from('lottery_numbers')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('added_at', { ascending: false });
+
+          if (error) throw error;
+          setNumbers(data || []);
+        } else {
+          // Si no hay usuario, cargar todos los números (modo demo)
+          const { data, error } = await supabase
+            .from('lottery_numbers')
+            .select('*')
+            .order('added_at', { ascending: false });
+
+          if (error) throw error;
+          setNumbers(data || []);
+        }
       } catch (err) {
         setError(err as Error);
         console.error('Error loading numbers:', err);
+        // En caso de error, mostrar array vacío para que la app funcione
+        setNumbers([]);
       } finally {
         setLoading(false);
       }
@@ -48,19 +78,30 @@ export function useLottery() {
 
   // Añadir número
   const addNumber = async (number: string, name: string, prize?: number) => {
-    if (!user) {
-      throw new Error('Usuario no autenticado');
-    }
-
     try {
+      // Modo demo: agregar localmente si no hay Supabase
+      if (!supabase) {
+        const newNumber: LotteryNumber = {
+          id: Date.now().toString(),
+          number: number.trim(),
+          name: name.trim(),
+          prize: prize || null,
+          added_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_id: null,
+        };
+        setNumbers([newNumber, ...numbers]);
+        return { data: newNumber, error: null };
+      }
+
       const { data, error } = await supabase
         .from('lottery_numbers')
         .insert({
           number: number.trim(),
           name: name.trim(),
           prize: prize || null,
-          user_id: user.id,
-        })
+          user_id: user?.id || null,
+        } as any)
         .select()
         .single();
 
@@ -76,16 +117,18 @@ export function useLottery() {
 
   // Eliminar número
   const removeNumber = async (id: string) => {
-    if (!user) {
-      throw new Error('Usuario no autenticado');
-    }
-
     try {
+      // Modo demo: eliminar localmente si no hay Supabase
+      if (!supabase) {
+        setNumbers(numbers.filter(n => n.id !== id));
+        return { error: null };
+      }
+
       const { error } = await supabase
         .from('lottery_numbers')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', user?.id || null);
 
       if (error) throw error;
 
@@ -99,16 +142,18 @@ export function useLottery() {
 
   // Actualizar número
   const updateNumber = async (id: string, updates: Partial<LotteryNumber>) => {
-    if (!user) {
-      throw new Error('Usuario no autenticado');
-    }
-
     try {
+      // Modo demo: actualizar localmente si no hay Supabase
+      if (!supabase) {
+        setNumbers(numbers.map(n => n.id === id ? { ...n, ...updates } : n));
+        return { data: { ...numbers.find(n => n.id === id)!, ...updates }, error: null };
+      }
+
       const { data, error } = await supabase
         .from('lottery_numbers')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id || null)
         .select()
         .single();
 
@@ -155,11 +200,10 @@ export function useLottery() {
     updateNumber,
     updatePrizes,
     refetch: async () => {
-      if (!user) return;
       const { data } = await supabase
         .from('lottery_numbers')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id || null)
         .order('added_at', { ascending: false });
       if (data) setNumbers(data);
     },
