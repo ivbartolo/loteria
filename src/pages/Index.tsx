@@ -1,44 +1,22 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Plus, Trash2, Sparkles, Camera, Image } from "lucide-react";
 import { toast } from "sonner";
 import { createWorker } from 'tesseract.js';
-
-interface LotteryNumber {
-  id: string;
-  number: string;
-  name: string;
-  addedAt: Date;
-  prize?: number;
-}
+import { useLottery } from "@/hooks/use-lottery";
 
 const Index = () => {
-  const [numbers, setNumbers] = useState<LotteryNumber[]>([]);
+  const { numbers, loading, addNumber, removeNumber, updatePrizes } = useLottery();
   const [inputValue, setInputValue] = useState("");
   const [nameValue, setNameValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [prizeResults, setPrizeResults] = useState<Map<string, number>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("lotteryNumbers");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      setNumbers(parsed.map((n: any) => ({ ...n, addedAt: new Date(n.addedAt) })));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (numbers.length > 0) {
-      localStorage.setItem("lotteryNumbers", JSON.stringify(numbers));
-    }
-  }, [numbers]);
-
-  const addNumber = () => {
+  const handleAddNumber = async () => {
     const trimmed = inputValue.trim();
     const trimmedName = nameValue.trim();
     
@@ -62,28 +40,32 @@ const Index = () => {
       return;
     }
 
-    const newNumber: LotteryNumber = {
-      id: Date.now().toString(),
-      number: trimmed,
-      name: trimmedName,
-      addedAt: new Date(),
-      prize: prizeResults.get(trimmed),
-    };
+    const result = await addNumber(trimmed, trimmedName);
+    
+    if (result.error) {
+      toast.error(result.error.message || "Error al añadir el número");
+      return;
+    }
 
-    setNumbers([newNumber, ...numbers]);
     setInputValue("");
     setNameValue("");
     toast.success("Número añadido correctamente");
   };
 
-  const removeNumber = (id: string) => {
-    setNumbers(numbers.filter(n => n.id !== id));
+  const handleRemoveNumber = async (id: string) => {
+    const result = await removeNumber(id);
+    
+    if (result.error) {
+      toast.error("Error al eliminar el número");
+      return;
+    }
+
     toast.success("Número eliminado");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      addNumber();
+      handleAddNumber();
     }
   };
 
@@ -163,16 +145,10 @@ const Index = () => {
         }
       }
       
-      setPrizeResults(results);
+      // Actualizar premios en la base de datos
+      await updatePrizes(results);
       
-      // Actualizar números existentes con premios
-      const updatedNumbers = numbers.map(n => ({
-        ...n,
-        prize: results.get(n.number)
-      }));
-      setNumbers(updatedNumbers);
-      
-      const winnersCount = updatedNumbers.filter(n => n.prize).length;
+      const winnersCount = numbers.filter(n => results.has(n.number)).length;
       if (winnersCount > 0) {
         toast.success(`¡Encontrados ${winnersCount} números premiados!`);
       } else {
@@ -194,6 +170,17 @@ const Index = () => {
       toast.error("Por favor selecciona un archivo PDF");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 flex items-center justify-center">
+        <div className="text-center">
+          <Sparkles className="h-12 w-12 text-primary animate-pulse mx-auto mb-4" />
+          <p className="text-muted-foreground">Cargando números...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
@@ -238,7 +225,7 @@ const Index = () => {
                 disabled={isProcessing}
               />
               <Button
-                onClick={addNumber}
+                onClick={handleAddNumber}
                 size="lg"
                 disabled={isProcessing}
                 className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-festive transition-all duration-300 h-12"
@@ -350,13 +337,13 @@ const Index = () => {
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          Añadido el {new Date(item.addedAt).toLocaleDateString("es-ES")}
+                          Añadido el {new Date(item.added_at).toLocaleDateString("es-ES")}
                         </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeNumber(item.id)}
+                        onClick={() => handleRemoveNumber(item.id)}
                         className="opacity-60 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
                       >
                         <Trash2 className="h-5 w-5" />
