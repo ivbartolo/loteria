@@ -124,14 +124,18 @@ export function useLottery() {
         return { error: null };
       }
 
+      // Eliminar usando solo el ID, sin filtrar por user_id
       const { error } = await supabase
         .from('lottery_numbers')
         .delete()
-        .eq('id', id)
-        .eq('user_id', user?.id || null);
+        .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error from Supabase:', error);
+        throw error;
+      }
 
+      // Actualizar el estado local
       setNumbers(numbers.filter(n => n.id !== id));
       return { error: null };
     } catch (err) {
@@ -149,9 +153,9 @@ export function useLottery() {
         return { data: { ...numbers.find(n => n.id === id)!, ...updates }, error: null };
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lottery_numbers')
-        .update(updates as any)
+        .update(updates)
         .eq('id', id)
         .eq('user_id', user?.id || null)
         .select()
