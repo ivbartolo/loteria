@@ -313,68 +313,6 @@ const Index = () => {
           />
         </Card>
 
-        {/* Statistics Section */}
-        {totalNumbers > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="border-2">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Números</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">
-                  {totalNumbers}
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={`border-2 ${winnersCount > 0 ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Trophy className="h-4 w-4" />
-                  Números Premiados
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-3xl font-bold ${winnersCount > 0 ? 'text-green-600' : ''}`}>
-                  {winnersCount}
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={`border-2 ${totalPrize > 0 ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Premio Total</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-3xl font-bold ${totalPrize > 0 ? 'text-green-600' : ''}`}>
-                  {totalPrize > 0 ? `${totalPrize.toLocaleString("es-ES")} €` : '-'}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Winners Banner */}
-        {winnersCount > 0 && (
-          <Card className="mb-8 bg-gradient-to-r from-green-500 to-emerald-600 border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between text-white">
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-8 w-8" />
-                  <div>
-                    <h3 className="text-2xl font-bold">¡Felicidades!</h3>
-                    <p className="text-green-50">
-                      Tienes {winnersCount} número{winnersCount > 1 ? 's' : ''} premiado{winnersCount > 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-3xl font-bold">{totalPrize.toLocaleString("es-ES")} €</p>
-                  <p className="text-green-50">Premio Total</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Numbers Grid */}
         {numbers.length === 0 ? (
           <Card className="p-12 text-center border-dashed border-2">
@@ -474,6 +412,68 @@ const Index = () => {
                 </Card>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Winners Banner */}
+        {winnersCount > 0 && (
+          <Card className="mt-8 bg-gradient-to-r from-green-500 to-emerald-600 border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between text-white">
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-8 w-8" />
+                  <div>
+                    <h3 className="text-2xl font-bold">¡Felicidades!</h3>
+                    <p className="text-green-50">
+                      Tienes {winnersCount} número{winnersCount > 1 ? 's' : ''} premiado{winnersCount > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-bold">{totalPrize.toLocaleString("es-ES")} €</p>
+                  <p className="text-green-50">Premio Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Statistics Section */}
+        {totalNumbers > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+            <Card className="border-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Números</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">
+                  {totalNumbers}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={`border-2 ${winnersCount > 0 ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Números Premiados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${winnersCount > 0 ? 'text-green-600' : ''}`}>
+                  {winnersCount}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={`border-2 ${totalPrize > 0 ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Premio Total</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${totalPrize > 0 ? 'text-green-600' : ''}`}>
+                  {totalPrize > 0 ? `${totalPrize.toLocaleString("es-ES")} €` : '-'}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
