@@ -173,8 +173,6 @@ export function useLottery() {
 
   // Actualizar premios desde un Map
   const updatePrizes = async (prizeResults: Map<string, number>) => {
-    if (!user) return;
-
     try {
       const updates = numbers.map(async (num) => {
         const prize = prizeResults.get(num.number);

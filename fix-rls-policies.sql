@@ -47,3 +47,5 @@ CREATE POLICY "Allow public delete for demo"
 -- ⚠️  Solo usar para modo demo/desarrollo
 -- ⚠️  Para producción, implementar autenticación adecuada
 -- ⚠️  Considerar límites de rate limiting
+
+

@@ -1,20 +1,39 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Plus, Trash2, Sparkles, Camera, Image } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Sparkles, Camera, Image, Trophy, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createWorker } from 'tesseract.js';
 import { useLottery } from "@/hooks/use-lottery";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Index = () => {
   const { numbers, loading, addNumber, removeNumber, updatePrizes } = useLottery();
   const [inputValue, setInputValue] = useState("");
   const [nameValue, setNameValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Calcular estadísticas
+  const winners = numbers.filter(n => n.prize && n.prize > 0);
+  const totalPrize = winners.reduce((sum, n) => sum + (n.prize || 0), 0);
+  const totalNumbers = numbers.length;
+  const winnersCount = winners.length;
 
   const handleAddNumber = async () => {
     const trimmed = inputValue.trim();
@@ -60,6 +79,7 @@ const Index = () => {
       return;
     }
 
+    setDeleteDialogOpen(null);
     toast.success("Número eliminado");
   };
 
@@ -293,6 +313,68 @@ const Index = () => {
           />
         </Card>
 
+        {/* Statistics Section */}
+        {totalNumbers > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="border-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Números</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">
+                  {totalNumbers}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={`border-2 ${winnersCount > 0 ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Números Premiados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${winnersCount > 0 ? 'text-green-600' : ''}`}>
+                  {winnersCount}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={`border-2 ${totalPrize > 0 ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Premio Total</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${totalPrize > 0 ? 'text-green-600' : ''}`}>
+                  {totalPrize > 0 ? `${totalPrize.toLocaleString("es-ES")} €` : '-'}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Winners Banner */}
+        {winnersCount > 0 && (
+          <Card className="mb-8 bg-gradient-to-r from-green-500 to-emerald-600 border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between text-white">
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-8 w-8" />
+                  <div>
+                    <h3 className="text-2xl font-bold">¡Felicidades!</h3>
+                    <p className="text-green-50">
+                      Tienes {winnersCount} número{winnersCount > 1 ? 's' : ''} premiado{winnersCount > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-bold">{totalPrize.toLocaleString("es-ES")} €</p>
+                  <p className="text-green-50">Premio Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Numbers Grid */}
         {numbers.length === 0 ? (
           <Card className="p-12 text-center border-dashed border-2">
@@ -320,37 +402,75 @@ const Index = () => {
               {numbers.map((item) => (
                 <Card
                   key={item.id}
-                  className="group relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-festive"
+                  className={`group relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-festive ${
+                    item.prize ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''
+                  }`}
                 >
                   <div className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="text-3xl font-bold text-primary mb-2">
-                          {item.number}
-                        </p>
-                        <p className="text-sm font-medium text-foreground mb-1">
-                          {item.name}
-                        </p>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
                         {item.prize && (
-                          <p className="text-lg font-bold text-green-600 mb-1">
-                            ¡Premio: {item.prize.toLocaleString("es-ES")} €!
-                          </p>
+                          <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                            <Trophy className="h-3 w-3 mr-1" />
+                            Premiado
+                          </Badge>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          Añadido el {new Date(item.added_at).toLocaleDateString("es-ES")}
-                        </p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveNumber(item.id)}
-                        className="opacity-60 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
+                      <AlertDialog open={deleteDialogOpen === item.id} onOpenChange={(open) => setDeleteDialogOpen(open ? item.id : null)}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="opacity-60 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2">
+                              <AlertCircle className="h-5 w-5 text-destructive" />
+                              ¿Eliminar número?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Estás a punto de eliminar el número <strong>{item.number}</strong> ({item.name}).
+                              Esta acción no se puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleRemoveNumber(item.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                    <div className="space-y-1">
+                      <p className={`text-3xl font-bold ${item.prize ? 'text-green-600' : 'text-primary'} mb-2`}>
+                        {item.number}
+                      </p>
+                      <p className="text-sm font-medium text-foreground">
+                        {item.name}
+                      </p>
+                      {item.prize && (
+                        <p className="text-xl font-bold text-green-600">
+                          {item.prize.toLocaleString("es-ES")} €
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Añadido el {new Date(item.added_at).toLocaleDateString("es-ES")}
+                      </p>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-secondary to-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className={`absolute bottom-0 left-0 right-0 h-1 transition-opacity ${
+                    item.prize 
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 opacity-100' 
+                      : 'bg-gradient-to-r from-primary via-secondary to-accent opacity-0 group-hover:opacity-100'
+                  }`} />
                 </Card>
               ))}
             </div>

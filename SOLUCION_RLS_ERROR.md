@@ -43,3 +43,5 @@ Después de ejecutar el fix, verifica que funciona:
 1. Ejecuta el fix en Supabase
 2. Prueba la aplicación
 3. ¡Disfruta tu app de lotería funcionando!
+
+
