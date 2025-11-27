@@ -105,7 +105,7 @@ const Index = () => {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
-        // Grayscale and Binarization
+        // Grayscale only (let Tesseract handle binarization)
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i];
           const g = data[i + 1];
@@ -113,13 +113,9 @@ const Index = () => {
           // Luminance formula
           const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-          // Simple binarization with threshold
-          // Adjust threshold as needed, 128 is a good starting point
-          const val = gray > 128 ? 255 : 0;
-
-          data[i] = val;
-          data[i + 1] = val;
-          data[i + 2] = val;
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
         }
 
         ctx.putImageData(imageData, 0, 0);
@@ -138,25 +134,31 @@ const Index = () => {
       const processedImage = await preprocessImage(file);
       const worker = await createWorker('spa');
 
-      // Configure Tesseract to only look for numbers
+      // Configure Tesseract
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789',
+        tessedit_char_whitelist: '0123456789 ', // Add space to whitelist
       });
 
       const { data: { text } } = await worker.recognize(processedImage);
       await worker.terminate();
 
-      console.log("Recognized text:", text); // For debugging
+      console.log("Recognized text:", text);
 
-      // Buscar números de 5 dígitos en el texto
-      const fiveDigitNumbers = text.match(/\b\d{5}\b/g);
+      // Regex flexible: permite espacios o puntos entre dígitos
+      // Busca 5 dígitos que pueden estar separados por espacios o puntos
+      const match = text.match(/(\d[\s\.]?){4}\d/g);
+
+      // Limpiar los matches para obtener solo los números
+      const cleanNumbers = match ? match.map(m => m.replace(/[^\d]/g, '')) : [];
+      const fiveDigitNumbers = cleanNumbers.filter(n => n.length === 5);
 
       if (fiveDigitNumbers && fiveDigitNumbers.length > 0) {
-        // Tomar el primer número de 5 dígitos encontrado
         setInputValue(fiveDigitNumbers[0]);
         toast.success("Número detectado: " + fiveDigitNumbers[0]);
       } else {
-        toast.error("No se detectó ningún número de 5 dígitos");
+        // Show what was detected to help debugging
+        const cleanText = text.replace(/\s+/g, ' ').trim().substring(0, 20);
+        toast.error(`No se detectó número. Texto leído: "${cleanText}..."`);
       }
     } catch (error) {
       console.error("Error processing image:", error);
@@ -454,8 +456,8 @@ const Index = () => {
                     </div>
                   </div>
                   <div className={`absolute bottom-0 left-0 right-0 h-1 transition-opacity ${item.prize
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 opacity-100'
-                      : 'bg-gradient-to-r from-primary via-secondary to-accent opacity-0 group-hover:opacity-100'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 opacity-100'
+                    : 'bg-gradient-to-r from-primary via-secondary to-accent opacity-0 group-hover:opacity-100'
                     }`} />
                 </Card>
               ))}
