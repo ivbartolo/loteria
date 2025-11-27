@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Sparkles, Camera, Image, Trophy, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { createWorker } from 'tesseract.js';
+import { createWorker, PSM } from 'tesseract.js';
 import { useLottery } from "@/hooks/use-lottery";
 import {
   AlertDialog,
@@ -18,6 +18,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Index = () => {
   const { numbers, loading, addNumber, removeNumber, updatePrizes } = useLottery();
@@ -89,36 +96,100 @@ const Index = () => {
     }
   };
 
+  const [debugInfo, setDebugInfo] = useState<{ imageUrl: string; text: string } | null>(null);
+
+  const preprocessImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          reject(new Error("Could not get canvas context"));
+          return;
+        }
+
+        // Resize if too large (max 800px width)
+        const MAX_WIDTH = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = (height * MAX_WIDTH) / width;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw resized image
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Get image data for processing
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        // Contrast factor (1.2 = 20% more contrast)
+        const contrast = 1.2;
+        const intercept = 128 * (1 - contrast);
+
+        // Apply grayscale and contrast
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          // Grayscale
+          let gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+          // Apply contrast
+          gray = gray * contrast + intercept;
+
+          // Clamp values
+          gray = Math.max(0, Math.min(255, gray));
+
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const processImage = async (file: File) => {
     setIsProcessing(true);
     toast.info("Procesando imagen...");
 
     try {
-      // Use English for better number recognition
+      const processedImage = await preprocessImage(file);
       const worker = await createWorker('eng');
 
-      // Configure Tesseract for better number recognition
       await worker.setParameters({
         tessedit_char_whitelist: '0123456789',
-        tessedit_pageseg_mode: '6', // Assume uniform block of text
+        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
       });
 
-      const { data: { text } } = await worker.recognize(file);
+      const { data: { text } } = await worker.recognize(processedImage);
       await worker.terminate();
 
       console.log("Recognized text:", text);
 
-      // Extract all sequences of 5 digits
-      const allNumbers = text.replace(/\s+/g, ''); // Remove all whitespace
+      const allNumbers = text.replace(/\s+/g, '');
       const fiveDigitMatches = allNumbers.match(/\d{5}/g);
 
       if (fiveDigitMatches && fiveDigitMatches.length > 0) {
         setInputValue(fiveDigitMatches[0]);
         toast.success("Número detectado: " + fiveDigitMatches[0]);
       } else {
-        // Show what was detected to help debugging
-        const cleanText = text.replace(/\s+/g, ' ').trim().substring(0, 30);
-        toast.error(`No se detectó número de 5 dígitos. Texto: "${cleanText}"`);
+        const cleanText = text.replace(/\s+/g, ' ').trim().substring(0, 50);
+        toast.error(`No se detectó número. Abre el depurador para ver detalles.`);
+        setDebugInfo({ imageUrl: processedImage, text: text });
       }
     } catch (error) {
       console.error("Error processing image:", error);
@@ -486,6 +557,39 @@ const Index = () => {
             </Card>
           </div>
         )}
+        {/* Debug Dialog */}
+        <Dialog open={!!debugInfo} onOpenChange={(open) => !open && setDebugInfo(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Depuración de OCR</DialogTitle>
+              <DialogDescription>
+                Esto es lo que la aplicación "ve" y "lee".
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div>
+                <h4 className="font-semibold mb-2">Imagen Procesada:</h4>
+                <div className="border rounded p-2 bg-muted/50 flex justify-center">
+                  {debugInfo?.imageUrl && (
+                    <img
+                      src={debugInfo.imageUrl}
+                      alt="Processed"
+                      className="max-w-full h-auto object-contain max-h-[400px]"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">Texto Detectado (Raw):</h4>
+                <pre className="bg-muted p-4 rounded text-xs overflow-x-auto whitespace-pre-wrap font-mono border">
+                  {debugInfo?.text || "No text detected"}
+                </pre>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
