@@ -194,7 +194,7 @@ const Index = () => {
       const worker = await createWorker('eng');
 
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789',
+        tessedit_char_whitelist: '0123456789/',
         tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
       });
 
@@ -203,12 +203,38 @@ const Index = () => {
 
       console.log("Recognized text:", text);
 
-      const allNumbers = text.replace(/\s+/g, '');
-      const fiveDigitMatches = allNumbers.match(/\d{5}/g);
+      // Strategy 1: Look for exact 5-digit numbers (word boundary)
+      // This avoids "102/25" because of the slash (if whitelisted)
+      const exactMatches = text.match(/\b\d{5}\b/g);
 
-      if (fiveDigitMatches && fiveDigitMatches.length > 0) {
-        setInputValue(fiveDigitMatches[0]);
-        toast.success("Número detectado: " + fiveDigitMatches[0]);
+      let detectedNumber = null;
+
+      if (exactMatches && exactMatches.length > 0) {
+        // If multiple matches, we might need heuristics. 
+        // Usually the main number is the first standalone 5-digit number 
+        // that isn't part of a longer sequence or date.
+        detectedNumber = exactMatches[0];
+      } else {
+        // Strategy 2: Fallback for spaced numbers "7 4 8 7 3"
+        // We carefully remove spaces but respect other separators like /
+        // Split by lines to avoid merging header numbers with body numbers
+        const lines = text.split('\n');
+        for (const line of lines) {
+          // Skip lines with / (likely series/fraction)
+          if (line.includes('/')) continue;
+
+          const cleanLine = line.replace(/\s+/g, '');
+          const match = cleanLine.match(/\d{5}/);
+          if (match) {
+            detectedNumber = match[0];
+            break;
+          }
+        }
+      }
+
+      if (detectedNumber) {
+        setInputValue(detectedNumber);
+        toast.success("Número detectado: " + detectedNumber);
       } else {
         const cleanText = text.replace(/\s+/g, ' ').trim().substring(0, 50);
         toast.error(`No se detectó número. Abre el depurador para ver detalles.`);
