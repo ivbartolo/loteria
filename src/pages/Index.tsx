@@ -89,76 +89,36 @@ const Index = () => {
     }
   };
 
-  const preprocessImage = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = document.createElement('img');
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error("Could not get canvas context"));
-          return;
-        }
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-
-        // Grayscale only (let Tesseract handle binarization)
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          // Luminance formula
-          const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-          data[i] = gray;
-          data[i + 1] = gray;
-          data[i + 2] = gray;
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
-  };
-
   const processImage = async (file: File) => {
     setIsProcessing(true);
     toast.info("Procesando imagen...");
 
     try {
-      const processedImage = await preprocessImage(file);
-      const worker = await createWorker('spa');
+      // Use English for better number recognition
+      const worker = await createWorker('eng');
 
-      // Configure Tesseract
+      // Configure Tesseract for better number recognition
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789 ', // Add space to whitelist
+        tessedit_char_whitelist: '0123456789',
+        tessedit_pageseg_mode: '6', // Assume uniform block of text
       });
 
-      const { data: { text } } = await worker.recognize(processedImage);
+      const { data: { text } } = await worker.recognize(file);
       await worker.terminate();
 
       console.log("Recognized text:", text);
 
-      // Regex flexible: permite espacios o puntos entre dígitos
-      // Busca 5 dígitos que pueden estar separados por espacios o puntos
-      const match = text.match(/(\d[\s\.]?){4}\d/g);
+      // Extract all sequences of 5 digits
+      const allNumbers = text.replace(/\s+/g, ''); // Remove all whitespace
+      const fiveDigitMatches = allNumbers.match(/\d{5}/g);
 
-      // Limpiar los matches para obtener solo los números
-      const cleanNumbers = match ? match.map(m => m.replace(/[^\d]/g, '')) : [];
-      const fiveDigitNumbers = cleanNumbers.filter(n => n.length === 5);
-
-      if (fiveDigitNumbers && fiveDigitNumbers.length > 0) {
-        setInputValue(fiveDigitNumbers[0]);
-        toast.success("Número detectado: " + fiveDigitNumbers[0]);
+      if (fiveDigitMatches && fiveDigitMatches.length > 0) {
+        setInputValue(fiveDigitMatches[0]);
+        toast.success("Número detectado: " + fiveDigitMatches[0]);
       } else {
         // Show what was detected to help debugging
-        const cleanText = text.replace(/\s+/g, ' ').trim().substring(0, 20);
-        toast.error(`No se detectó número. Texto leído: "${cleanText}..."`);
+        const cleanText = text.replace(/\s+/g, ' ').trim().substring(0, 30);
+        toast.error(`No se detectó número de 5 dígitos. Texto: "${cleanText}"`);
       }
     } catch (error) {
       console.error("Error processing image:", error);
