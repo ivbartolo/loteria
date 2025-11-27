@@ -91,7 +91,7 @@ const Index = () => {
 
   const preprocessImage = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const img = new Image();
+      const img = document.createElement('img');
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
