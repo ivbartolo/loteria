@@ -110,8 +110,8 @@ const Index = () => {
           return;
         }
 
-        // Resize if too large (max 800px width)
-        const MAX_WIDTH = 800;
+        // Resize if too large (max 1600px width for better detail)
+        const MAX_WIDTH = 1600;
         let width = img.width;
         let height = img.height;
 
@@ -130,28 +130,51 @@ const Index = () => {
         const imageData = ctx.getImageData(0, 0, width, height);
         const data = imageData.data;
 
-        // Contrast factor (1.2 = 20% more contrast)
+        // Create a buffer for sharpening
+        const w = width;
+        const h = height;
+        const buff = new Uint8ClampedArray(data);
+
+        // Sharpen kernel
+        //  0 -1  0
+        // -1  5 -1
+        //  0 -1  0
+        const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+
+        // Contrast factor
         const contrast = 1.2;
         const intercept = 128 * (1 - contrast);
 
-        // Apply grayscale and contrast
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
+        // Apply sharpening, grayscale and contrast
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = (y * w + x) * 4;
 
-          // Grayscale
-          let gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            // Apply sharpening to RGB channels
+            for (let c = 0; c < 3; c++) {
+              let val = 0;
+              val += buff[((y - 1) * w + (x)) * 4 + c] * kernel[1];
+              val += buff[((y) * w + (x - 1)) * 4 + c] * kernel[3];
+              val += buff[((y) * w + (x)) * 4 + c] * kernel[4];
+              val += buff[((y) * w + (x + 1)) * 4 + c] * kernel[5];
+              val += buff[((y + 1) * w + (x)) * 4 + c] * kernel[7];
 
-          // Apply contrast
-          gray = gray * contrast + intercept;
+              data[idx + c] = val;
+            }
 
-          // Clamp values
-          gray = Math.max(0, Math.min(255, gray));
+            // Convert to grayscale and contrast
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
 
-          data[i] = gray;
-          data[i + 1] = gray;
-          data[i + 2] = gray;
+            let gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            gray = gray * contrast + intercept;
+            gray = Math.max(0, Math.min(255, gray));
+
+            data[idx] = gray;
+            data[idx + 1] = gray;
+            data[idx + 2] = gray;
+          }
         }
 
         ctx.putImageData(imageData, 0, 0);
