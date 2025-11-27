@@ -1,15 +1,16 @@
-import { supabase } from './client';
+import { getSupabaseClient } from './client';
 import type { Database } from './types';
-import type { PostgrestError } from '@supabase/supabase-js';
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 
 // Generic database helper functions
 export const db = {
   // Generic query helper with error handling
   async query<T>(
-    queryFn: () => Promise<{ data: T | null; error: PostgrestError | null }>
+    queryFn: (client: SupabaseClient<Database>) => Promise<{ data: T | null; error: PostgrestError | null }>
   ) {
     try {
-      const { data, error } = await queryFn();
+      const client = getSupabaseClient();
+      const { data, error } = await queryFn(client);
       
       if (error) {
         console.error('Database error:', error);
@@ -31,7 +32,7 @@ export const db = {
     values: Database['public']['Tables'][T]['Insert']
   ) {
     return this.query(() => 
-      supabase
+      getSupabaseClient()
         .from(table)
         .insert(values)
         .select()
@@ -45,7 +46,7 @@ export const db = {
     values: Database['public']['Tables'][T]['Insert'][]
   ) {
     return this.query(() => 
-      supabase
+      getSupabaseClient()
         .from(table)
         .insert(values)
         .select()
@@ -57,7 +58,8 @@ export const db = {
     table: T,
     filters?: Partial<Database['public']['Tables'][T]['Row']>
   ) {
-    let query = supabase.from(table).select('*');
+    const client = getSupabaseClient();
+    let query = client.from(table).select('*');
     
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
@@ -75,7 +77,7 @@ export const db = {
     values: Database['public']['Tables'][T]['Update']
   ) {
     return this.query(() => 
-      supabase
+      getSupabaseClient()
         .from(table)
         .update(values)
         .eq('id', id)
@@ -90,7 +92,7 @@ export const db = {
     id: string
   ) {
     return this.query(() => 
-      supabase
+      getSupabaseClient()
         .from(table)
         .delete()
         .eq('id', id)
@@ -105,7 +107,7 @@ export const db = {
     id: string
   ) {
     return this.query(() => 
-      supabase
+      getSupabaseClient()
         .from(table)
         .select('*')
         .eq('id', id)
@@ -119,8 +121,9 @@ export const db = {
     path: string,
     file: File
   ) {
+    const client = getSupabaseClient();
     try {
-      const { data, error } = await supabase.storage
+      const { data, error } = await client.storage
         .from(bucket)
         .upload(path, file, {
           cacheControl: '3600',
@@ -130,7 +133,7 @@ export const db = {
       if (error) throw error;
 
       // Get public URL
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = client.storage
         .from(bucket)
         .getPublicUrl(path);
 
@@ -142,8 +145,9 @@ export const db = {
 
   // Delete a file from Supabase Storage
   async deleteFile(bucket: string, path: string) {
+    const client = getSupabaseClient();
     try {
-      const { error } = await supabase.storage
+      const { error } = await client.storage
         .from(bucket)
         .remove([path]);
 
@@ -156,7 +160,8 @@ export const db = {
 
   // Get public URL for a file
   getPublicUrl(bucket: string, path: string) {
-    const { data } = supabase.storage
+    const client = getSupabaseClient();
+    const { data } = client.storage
       .from(bucket)
       .getPublicUrl(path);
 

@@ -1,5 +1,5 @@
 // Main Supabase client
-export { supabase, isSupabaseConfigured } from './client';
+export { supabase, isSupabaseConfigured, getSupabaseClient } from './client';
 
 // Auth utilities
 export { auth } from './auth';

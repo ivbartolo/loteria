@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '@/integrations/supabase';
+import { isSupabaseConfigured, getSupabaseClient } from '@/integrations/supabase';
 import { Card } from '@/components/ui/card';
 
 export function SupabaseStatus() {
@@ -16,8 +16,10 @@ export function SupabaseStatus() {
           return;
         }
 
+        const client = getSupabaseClient();
+
         // Probar conexión básica
-        const { error } = await supabase.from('_empty').select('*').limit(0);
+        const { error } = await client.from('_empty').select('*').limit(0);
         
         if (error && error.code !== 'PGRST116') {
           setStatus('error');
@@ -27,7 +29,7 @@ export function SupabaseStatus() {
           setMessage('✅ Supabase conectado correctamente');
           
           // Obtener usuario si existe
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { user } } = await client.auth.getUser();
           setUser(user?.email || null);
         }
       } catch (err) {
