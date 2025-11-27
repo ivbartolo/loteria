@@ -38,7 +38,7 @@ const Index = () => {
   const handleAddNumber = async () => {
     const trimmed = inputValue.trim();
     const trimmedName = nameValue.trim();
-    
+
     if (!trimmed) {
       toast.error("Por favor introduce un número");
       return;
@@ -60,7 +60,7 @@ const Index = () => {
     }
 
     const result = await addNumber(trimmed, trimmedName);
-    
+
     if (result.error) {
       toast.error(result.error.message || "Error al añadir el número");
       return;
@@ -73,7 +73,7 @@ const Index = () => {
 
   const handleRemoveNumber = async (id: string) => {
     const result = await removeNumber(id);
-    
+
     if (result.error) {
       toast.error("Error al eliminar el número");
       return;
@@ -89,18 +89,68 @@ const Index = () => {
     }
   };
 
+  const preprocessImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error("Could not get canvas context"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Grayscale and Binarization
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          // Luminance formula
+          const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+          // Simple binarization with threshold
+          // Adjust threshold as needed, 128 is a good starting point
+          const val = gray > 128 ? 255 : 0;
+
+          data[i] = val;
+          data[i + 1] = val;
+          data[i + 2] = val;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const processImage = async (file: File) => {
     setIsProcessing(true);
     toast.info("Procesando imagen...");
-    
+
     try {
+      const processedImage = await preprocessImage(file);
       const worker = await createWorker('spa');
-      const { data: { text } } = await worker.recognize(file);
+
+      // Configure Tesseract to only look for numbers
+      await worker.setParameters({
+        tessedit_char_whitelist: '0123456789',
+      });
+
+      const { data: { text } } = await worker.recognize(processedImage);
       await worker.terminate();
-      
+
+      console.log("Recognized text:", text); // For debugging
+
       // Buscar números de 5 dígitos en el texto
       const fiveDigitNumbers = text.match(/\b\d{5}\b/g);
-      
+
       if (fiveDigitNumbers && fiveDigitNumbers.length > 0) {
         // Tomar el primer número de 5 dígitos encontrado
         setInputValue(fiveDigitNumbers[0]);
@@ -134,14 +184,14 @@ const Index = () => {
   const processPDF = async (file: File) => {
     setIsProcessing(true);
     toast.info("Procesando PDF...");
-    
+
     try {
       const pdfjsLib = await import('pdfjs-dist');
       pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-      
+
       let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -149,25 +199,25 @@ const Index = () => {
         const pageText = textContent.items.map((item: any) => item.str).join(' ');
         fullText += pageText + ' ';
       }
-      
+
       // Buscar números de 5 dígitos y sus premios
       const results = new Map<string, number>();
       const numberPattern = /(\d{5})[^\d]*?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)\s*€?/g;
       let match;
-      
+
       while ((match = numberPattern.exec(fullText)) !== null) {
         const number = match[1];
         const prizeStr = match[2].replace(/[.,]/g, '');
         const prize = parseInt(prizeStr) / 100; // Convertir a euros
-        
+
         if (prize > 0) {
           results.set(number, prize);
         }
       }
-      
+
       // Actualizar premios en la base de datos
       await updatePrizes(results);
-      
+
       const winnersCount = numbers.filter(n => results.has(n.number)).length;
       if (winnersCount > 0) {
         toast.success(`¡Encontrados ${winnersCount} números premiados!`);
@@ -254,7 +304,7 @@ const Index = () => {
                 Añadir
               </Button>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={handleCameraClick}
@@ -340,9 +390,8 @@ const Index = () => {
               {numbers.map((item) => (
                 <Card
                   key={item.id}
-                  className={`group relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-festive ${
-                    item.prize ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''
-                  }`}
+                  className={`group relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-festive ${item.prize ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''
+                    }`}
                 >
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-2">
@@ -404,11 +453,10 @@ const Index = () => {
                       </p>
                     </div>
                   </div>
-                  <div className={`absolute bottom-0 left-0 right-0 h-1 transition-opacity ${
-                    item.prize 
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 opacity-100' 
+                  <div className={`absolute bottom-0 left-0 right-0 h-1 transition-opacity ${item.prize
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 opacity-100'
                       : 'bg-gradient-to-r from-primary via-secondary to-accent opacity-0 group-hover:opacity-100'
-                  }`} />
+                    }`} />
                 </Card>
               ))}
             </div>
